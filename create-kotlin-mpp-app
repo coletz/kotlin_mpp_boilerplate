@@ -1,0 +1,179 @@
+function clearPath {
+	initialPath=$(pwd)
+	cd $1
+	mkdir -p "${domain}/${company}/${projectName}"
+	mv co/touchlab/kampkit/* "${domain}/${company}/${projectName}/"
+	rmdir "co/touchlab/kampkit" "co/touchlab" "co"
+	cd "${initialPath}"
+}
+
+## Check all tools: right now, only rename
+if ! command -v rename &> /dev/null; then
+    echo "Command rename not found. On macOS, install it with:"
+    echo "brew install rename"
+    exit -1
+fi
+
+## Check if kamp directory exists
+ORIGINAL_KAMP_KIT="~/.create-kotlin-mpp-app/original_kamp_kit"
+if [ -d ${ORIGINAL_KAMP_KIT} ]; then
+    ## If exists, git pull
+    cd "${ORIGINAL_KAMP_KIT}";
+    git pull
+    cd ..
+else
+    ## Else, git clone
+    git clone https://github.com/touchlab/KaMPKit.git "${ORIGINAL_KAMP_KIT}"
+fi
+
+## Ask user for some project data
+read -p 'App name: ' appName
+if [ -z "${appName}" ]; then
+      echo "Cannot proceed without a valid app name"
+      exit -1
+fi
+
+read -p 'Root folder name (without spaces): ' rootFolder
+if [ -z "${rootFolder}" ]; then
+      echo "Cannot proceed without a valid project name"
+      exit -1
+fi
+
+## If root folder already exists, abort
+if [ -d ${rootFolder} ]; then
+    echo "Folder ${rootFolder}" already exits. Aborting.
+    exit -1
+fi
+
+read -p 'Domain: ' domain
+if [ -z "${domain}" ]; then
+      echo "Cannot proceed without a valid domain"
+      exit -1
+fi
+
+read -p 'Company: ' company
+if [ -z "${company}" ]; then
+      echo "Cannot proceed without a valid company"
+      exit -1
+fi
+
+read -p 'Project name: ' projectName
+if [ -z "${projectName}" ]; then
+      echo "Cannot proceed without a valid project name"
+      exit -1
+fi
+
+iosProjectName="$(tr '[:lower:]' '[:upper:]' <<< ${projectName:0:1})${projectName:1}iOS"
+dbName="$(tr '[:lower:]' '[:upper:]' <<< ${projectName:0:1})${projectName:1}Db"
+
+echo "Copying files from Touchlab's KaMP Kit"
+
+## Copy kamp directory in root folder
+cp -r "${ORIGINAL_KAMP_KIT}" "${rootFolder}"
+cd "${rootFolder}"
+
+echo "Cleaning template, this may take a while..."
+
+## Delete useless files and dirs
+rm CONTACT_US.md LICENSE.txt README.md azure/* docs/Screenshots/* docs/* kampkit.png tl2.png /* 2> /dev/null
+rmdir azure docs/Screenshots docs
+rm -rf .git
+
+### [Android] Rename files/folders
+clearPath "app/src/main/java"
+
+### [iOS] Rename files/folders
+find . -depth -execdir rename "s/KaMPKitiOS/${iosProjectName}/g" '{}' \;
+
+### [Shared] Rename files/folders
+clearPath "shared/src/androidTest/kotlin"
+clearPath "shared/src/iosMain/kotlin"
+clearPath "shared/src/commonMain/kotlin"
+clearPath "shared/src/commonMain/sqldelight"
+clearPath "shared/src/commonTest/kotlin"
+clearPath "shared/src/iosTest/kotlin"
+clearPath "shared/src/androidMain/kotlin"
+### [Root] Replace text
+# Change project name in gradle settings file
+settingsGradleFile="settings.gradle.kts"
+sed -i.bak "s/KaMPKit/${appName}/g" "${settingsGradleFile}"
+rm "${settingsGradleFile}.bak"
+# This will rename both android and ios prefs name
+grep -R -l --include \*.kt --include \*.swift "KAMPSTARTER_SETTINGS" . | while read file; do
+	sed -i.bak "s/KAMPSTARTER_SETTINGS/APP_PRIVATE_SETTINGS/g" "${file}"
+	rm "${file}.bak"
+done
+### [Android] Replace text
+cd app
+grep -R -l --include \*.kt --include \*.kts --include \*.xml "co.touchlab.kampkit" . | while read file; do
+	sed -i.bak "s/co\.touchlab\.kampkit/${domain}.${company}.${projectName}/g" "${file}"
+	rm "${file}.bak"
+done
+# Change app name
+androidAppNameFile="src/main/res/values/strings.xml"
+sed -i.bak "s/KaMP Kit/${appName}/g" "${androidAppNameFile}"
+rm "${androidAppNameFile}.bak"
+cd ..
+
+### [iOS] Replace text
+cd ios
+grep -R -l "KaMPKitiOS" . | while read file; do
+	sed -i.bak "s/KaMPKitiOS/${iosProjectName}/g" "${file}"
+	rm "${file}.bak"
+done
+grep -R -l "KaMPStarteriOS" . | while read file; do
+	sed -i.bak "s/KaMPStarteriOS/${iosProjectName}/g" "${file}"
+	rm "${file}.bak"
+done
+grep -R -l --include \*.pbxproj "co.touchlab.kampkit" . | while read file; do
+	sed -i.bak "s/co\.touchlab\.kampkit/${domain}.${company}.${projectName}/g" "${file}"
+	rm "${file}.bak"
+done
+grep -R -l --include \*.swift "Created by" . | while read file; do
+	sed -i.bak "/Created by/d" "${file}"
+	rm "${file}.bak"
+done
+grep -R -l --include \*.swift "Copyright" . | while read file; do
+	sed -i.bak "/Copyright/d" "${file}"
+	rm "${file}.bak"
+done
+iosPodspecFile="Pods/Local Podspecs/shared.podspec.json"
+sed -i.bak -E "/(\"homepage\"|\"summary\")/d" "${iosPodspecFile}"
+rm "${iosPodspecFile}.bak"
+cd ..
+### [Shared] Replace text
+cd shared
+grep -R -l --include \*.kt --include \*.kts --include \*.xml "co.touchlab.kampkit" . | while read file; do
+	sed -i.bak "s/co\.touchlab\.kampkit/${domain}.${company}.${projectName}/g" "${file}"
+	rm "${file}.bak"
+done
+# Rename database (macOS sed doesn't allow case insensitive, must do multiple operations)
+grep -R -l --include \*.kt --include \*.kts "KaMPKitDb" . | while read file; do
+	sed -i.bak "s/KaMPKitDb/${dbName}/g" "${file}"
+	rm "${file}.bak"
+done
+grep -R -l --include \*.kt --include \*.kts "KampkitDb" . | while read file; do
+	sed -i.bak "s/KampkitDb/${dbName}/g" "${file}"
+	rm "${file}.bak"
+done
+grep -R -l --include \*.kt --include \*.kts "kampkitdb" . | while read file; do
+	sed -i.bak "s/kampkitdb/${dbName}/g" "${file}"
+	rm "${file}.bak"
+done
+# Rename logger tag
+grep -R -l --include \*.kt "KampKit" . | while read file; do
+	sed -i.bak "s/.withTag(\"KampKit\")/.withTag(\"${projectName}\")/g" "${file}"
+	rm "${file}.bak"
+done
+# For now remove info from podspec && build.gradle
+sharedPodspecFile="shared.podspec"
+sed -i.bak -E "/(spec.homepage|spec.summary)/d" "${sharedPodspecFile}"
+rm "${sharedPodspecFile}.bak"
+sharedBuildGradleFile="build.gradle.kts"
+sed -i.bak -E "/(homepage =|summary =)/d" "${sharedBuildGradleFile}"
+rm "${sharedBuildGradleFile}.bak"
+# Remove last "KampKit" reference... sorry Touchlab and thanks for your incredible work!
+concurrencyTestFile="src/commonTest/kotlin/${domain}/${company}/${projectName}/ConcurrencyTest.kt"
+sed -i.bak -E "s/KampKit/app specific/g" "${concurrencyTestFile}"
+rm "${concurrencyTestFile}.bak"
+cd ..
