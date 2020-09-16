@@ -3,7 +3,15 @@ function clearPath {
 	cd $1
 	mkdir -p "${domain}/${company}/${projectName}"
 	mv co/touchlab/kampkit/* "${domain}/${company}/${projectName}/"
-	rmdir "co/touchlab/kampkit" "co/touchlab" "co"
+	if [ ! -n "$(ls -A co/touchlab/kampkit)" ]; then
+                rmdir "co/touchlab/kampkit"
+        fi
+        if [ ! -n "$(ls -A co/touchlab)" ]; then
+                rmdir "co/touchlab"
+        fi
+        if [ ! -n "$(ls -A co)" ]; then
+                rmdir "co"
+        fi
 	cd "${initialPath}"
 }
 
