@@ -20,7 +20,7 @@ if [ -d ${ORIGINAL_KAMP_KIT} ]; then
     ## If exists, git pull
     cd "${ORIGINAL_KAMP_KIT}";
     git pull
-    cd ..
+    cd -
 else
     ## Else, git clone
     git clone https://github.com/touchlab/KaMPKit.git "${ORIGINAL_KAMP_KIT}"
