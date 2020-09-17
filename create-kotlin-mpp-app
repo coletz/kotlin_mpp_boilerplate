@@ -15,7 +15,7 @@ if ! command -v rename &> /dev/null; then
 fi
 
 ## Check if kamp directory exists
-ORIGINAL_KAMP_KIT="~/.create-kotlin-mpp-app/original_kamp_kit"
+ORIGINAL_KAMP_KIT=~/.create-kotlin-mpp-app/original_kamp_kit
 if [ -d ${ORIGINAL_KAMP_KIT} ]; then
     ## If exists, git pull
     cd "${ORIGINAL_KAMP_KIT}";
@@ -26,16 +26,20 @@ else
     git clone https://github.com/touchlab/KaMPKit.git "${ORIGINAL_KAMP_KIT}"
 fi
 
+if [ $# -eq 0 ]; then
+	read -p 'Root folder name (without spaces): ' rootFolder
+	if [ -z "${rootFolder}" ]; then
+	      echo "Cannot proceed without a valid project name"
+	      exit -1
+	fi
+else
+	rootFolder=$1 
+fi
+
 ## Ask user for some project data
 read -p 'App name: ' appName
 if [ -z "${appName}" ]; then
       echo "Cannot proceed without a valid app name"
-      exit -1
-fi
-
-read -p 'Root folder name (without spaces): ' rootFolder
-if [ -z "${rootFolder}" ]; then
-      echo "Cannot proceed without a valid project name"
       exit -1
 fi
 
@@ -138,7 +142,9 @@ grep -R -l --include \*.swift "Copyright" . | while read file; do
 	rm "${file}.bak"
 done
 iosPodspecFile="Pods/Local Podspecs/shared.podspec.json"
-sed -i.bak -E "/(\"homepage\"|\"summary\")/d" "${iosPodspecFile}"
+sed -i.bak -E "s/(\"homepage\"[[:space:]]*\:[[:space:]]*)\".*\"/\1\"https:\/\/local.github\/local\/project\"/g" "${iosPodspecFile}"
+rm "${iosPodspecFile}.bak"
+sed -i.bak -E "s/(\"summary\"[[:space:]]*\:[[:space:]]*)\".*\"/\1\"Common lib\"/g" "${iosPodspecFile}"
 rm "${iosPodspecFile}.bak"
 cd ..
 ### [Shared] Replace text
@@ -165,12 +171,16 @@ grep -R -l --include \*.kt "KampKit" . | while read file; do
 	sed -i.bak "s/.withTag(\"KampKit\")/.withTag(\"${projectName}\")/g" "${file}"
 	rm "${file}.bak"
 done
-# For now remove info from podspec && build.gradle
+# Edit homepage/summary, use a fake local website
 sharedPodspecFile="shared.podspec"
-sed -i.bak -E "/(spec.homepage|spec.summary)/d" "${sharedPodspecFile}"
+sed -i.bak -E "s/(spec.homepage[[:space:]]+=[[:space:]]+)'.*'/\1'https:\/\/local.github\/local\/project'/g" "${sharedPodspecFile}"
+rm "${sharedPodspecFile}.bak"
+sed -i.bak -E "s/(spec.summary[[:space:]]+=[[:space:]]+)'.*'/\1'Common lib'/g" "${sharedPodspecFile}"
 rm "${sharedPodspecFile}.bak"
 sharedBuildGradleFile="build.gradle.kts"
-sed -i.bak -E "/(homepage =|summary =)/d" "${sharedBuildGradleFile}"
+sed -i.bak -E "s/(homepage[[:space:]]+=[[:space:]]+)\".*\"/\1\"https:\/\/local.github\/local\/project\"/g" "${sharedBuildGradleFile}"
+rm "${sharedBuildGradleFile}.bak"
+sed -i.bak -E "s/(summary[[:space:]]+=[[:space:]]+)\".*\"/\1\"Common lib"/g" "${sharedBuildGradleFile}"
 rm "${sharedBuildGradleFile}.bak"
 # Remove last "KampKit" reference... sorry Touchlab and thanks for your incredible work!
 concurrencyTestFile="src/commonTest/kotlin/${domain}/${company}/${projectName}/ConcurrencyTest.kt"
